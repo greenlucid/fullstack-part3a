@@ -1,9 +1,11 @@
 const { request, response } = require('express')
 const express = require('express')
 var morgan = require('morgan')
+var cors = require('cors')
 morgan.token('body', (request, response) => (JSON.stringify(request.body)))
 
 const app = express()
+app.use(cors())
 app.use(express.json())
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :body'))
 
@@ -82,7 +84,42 @@ app.post("/api/persons", (request, response) => {
     id: randomId
   }
   persons = persons.concat(person)
+  console.log(person)
+  
   response.json(person)
+})
+
+app.put("/api/persons/:id", (request, response) => {
+  const body = request.body
+  const id = Number(request.params.id)
+  
+  if (!body) {
+    return response.status(400).json({
+      error: "Body is undefined"
+    })
+  } else if (!body.name) {
+    return response.status(400).json({
+      error: "Name is empty or undefined"
+    })
+  } else if (!body.number) {
+    return response.status(400).json({
+      error: "Number is empty or undefined"
+    })
+  } else if (persons
+      .filter(person => person.id !== id).map(person => person.name).includes(body.name)) {
+    return response.status(400).json({
+      error: "Name has already been registered"
+    })
+  }
+
+  const newPerson = {
+    name: body.name,
+    number: body.number,
+    id: id
+  }
+
+  persons = persons.map(person => person.id !== id ? person : newPerson)
+  response.json(newPerson)
 })
 
 app.delete("/api/persons/:id", (request, response) => {
@@ -91,6 +128,6 @@ app.delete("/api/persons/:id", (request, response) => {
   response.status(204).end()
 })
 
-const PORT = 3001
+const PORT = process.env.PORT ?? 3001
 app.listen(PORT)
 console.log(`Server running on port ${PORT}`)
