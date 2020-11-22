@@ -6,6 +6,7 @@ morgan.token('body', (request, response) => (JSON.stringify(request.body)))
 
 const app = express()
 app.use(cors())
+app.use(express.static('build'))
 app.use(express.json())
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :body'))
 
