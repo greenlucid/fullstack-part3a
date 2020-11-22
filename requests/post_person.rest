@@ -1,7 +1,7 @@
-POST https://nameless-river-95895.herokuapp.com/api/persons
+POST http://localhost:3001/api/persons
 Content-Type: application/json
 
 {
-  "name": "Donald Duck",
+  "name": "Donad Duck",
   "number": "CALL-ME-1928"
 }
