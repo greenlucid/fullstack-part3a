@@ -1,3 +1,4 @@
+require('dotenv').config()
 const { request, response } = require('express')
 const express = require('express')
 var morgan = require('morgan')
@@ -10,28 +11,7 @@ app.use(express.static('build'))
 app.use(express.json())
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :body'))
 
-let persons = [
-  {
-    name: "Arto Man",
-    number: "123-123123",
-    id: 1
-  },
-  {
-    name: "MegaMan",
-    number: "633-1421123",
-    id: 2
-  },
-  {
-    name: "Satan",
-    number: "666",
-    id: 3
-  },
-  {
-    name: "George Bush",
-    number: "STONECUTTERS-912",
-    id: 4
-  }
-]
+const Person = require('./models/person')
 
 app.get('/', (request, response) => {
   response.send('What are you doing here?')
@@ -44,22 +24,23 @@ app.get("/info", (request, response) => {
 })
 
 app.get("/api/persons", (request, response) => {
-  response.json(persons)
+  Person.find({}).then(notes => {
+    response.json(notes)
+  })
 })
 
 app.get("/api/persons/:id", (request, response) => {
-  const id = Number(request.params.id)
-  const person = persons.find(person => person.id === id)
-  if (person){
-    response.json(person)
-  } else {
-    response.status(404).end()
-  }
+  Person.findById(request.params.id)
+    .then(person => {
+      person
+        ? response.json(person)
+        : response.status(404).end()
+    })
+    .catch(error => next(error))
 })
 
 app.post("/api/persons", (request, response) => {
   const body = request.body
-  const randomId = Math.floor(10000000000 * Math.random())
   
   if (!body) {
     return response.status(400).json({
@@ -73,26 +54,21 @@ app.post("/api/persons", (request, response) => {
     return response.status(400).json({
       error: 'number is undefined'
     })
-  } else if (persons.map(person => person.name).includes(body.name)) {
-    return response.status(400).json({
-      error: 'name is already in the phonebook'
-    })
   }
-  
-  const person = {
+
+  const person = new Person({
     name: body.name,
-    number: body.number,
-    id: randomId
-  }
-  persons = persons.concat(person)
-  console.log(person)
-  
-  response.json(person)
+    number: body.number
+  })
+
+  person.save()
+    .then(savedPerson => {
+      response.json(savedPerson)
+    })
 })
 
 app.put("/api/persons/:id", (request, response) => {
   const body = request.body
-  const id = Number(request.params.id)
   
   if (!body) {
     return response.status(400).json({
@@ -106,29 +82,46 @@ app.put("/api/persons/:id", (request, response) => {
     return response.status(400).json({
       error: "Number is empty or undefined"
     })
-  } else if (persons
-      .filter(person => person.id !== id).map(person => person.name).includes(body.name)) {
-    return response.status(400).json({
-      error: "Name has already been registered"
-    })
   }
 
   const newPerson = {
-    name: body.name,
-    number: body.number,
-    id: id
+    number: body.number
   }
-
-  persons = persons.map(person => person.id !== id ? person : newPerson)
-  response.json(newPerson)
+  
+  Person.findByIdAndUpdate(request.params.id, newPerson, { new: true })
+    .then(updatedPerson => {
+      response.json(updatedPerson)
+    })
+    .catch(error => next)
 })
 
 app.delete("/api/persons/:id", (request, response) => {
-  const id = Number(request.params.id)
-  persons = persons.filter(person => person.id !== id)
-  response.status(204).end()
+  Person.findByIdAndDelete(request.params.id)
+    .then(result => {
+      response.status(204).end()
+    })
+    .catch(error => next(error))
 })
 
-const PORT = process.env.PORT || 3001
+const unknownEndpoint = (request, response) => {
+  response.status(404).send({ error: 'unknown endpoint'})
+}
+
+app.use(unknownEndpoint)
+
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message)
+
+  if (error.name === 'CastError') {
+    return response.status(400).send({ error: 'malformatted id'})
+  }
+
+  next(error)
+}
+
+app.use(errorHandler)
+
+const PORT = process.env.PORT
 app.listen(PORT)
 console.log(`Server running on port ${PORT}`)
+
